@@ -1,87 +1,104 @@
-// Automatic Database Migration Script
-const { Pool } = require('pg');
+const express = require('express');
+const router = express.Router();
+const pool = require('../database/connection');
 const fs = require('fs');
 const path = require('path');
 
-async function runMigrations() {
-  console.log('🔄 Checking database schema...');
-
-  // Create a temporary pool for migration
-  const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? {
-      rejectUnauthorized: false
-    } : false
-  });
-
+// Force migration endpoint - drops and recreates all tables
+router.post('/force-migrate', async (req, res) => {
   try {
-    // Check if users table exists with correct structure
-    const checkQuery = `
-      SELECT EXISTS (
-        SELECT FROM information_schema.columns 
-        WHERE table_schema = 'public' 
-        AND table_name = 'users'
-        AND column_name = 'user_id'
-      ) as schema_exists;
-    `;
+    console.log('🔄 Force migration requested via API endpoint');
     
-    const result = await pool.query(checkQuery);
-    const schemaExists = result.rows[0].schema_exists;
+    // Drop all tables
+    console.log('🗑️  Dropping all existing tables...');
+    await pool.query(`
+      DROP TABLE IF EXISTS user_sessions CASCADE;
+      DROP TABLE IF EXISTS comments CASCADE;
+      DROP TABLE IF EXISTS analytics_events CASCADE;
+      DROP TABLE IF EXISTS notifications CASCADE;
+      DROP TABLE IF EXISTS workflow_history CASCADE;
+      DROP TABLE IF EXISTS published_content CASCADE;
+      DROP TABLE IF EXISTS content_submissions CASCADE;
+      DROP TABLE IF EXISTS categories CASCADE;
+      DROP TABLE IF EXISTS users CASCADE;
+      DROP FUNCTION IF EXISTS update_updated_at_column CASCADE;
+    `);
+    console.log('✅ All tables dropped');
 
-    if (schemaExists) {
-      console.log('✅ Database schema already exists. Skipping migration.');
-      await pool.end();
-      return;
-    }
-
-    console.log('📦 Database schema not found. Running migration...');
-
-    // Read the schema file
+    // Read and execute schema
+    console.log('📦 Creating new schema...');
     const schemaPath = path.join(__dirname, '../../database/schema/01_create_tables.sql');
     
     let schemaSQL;
     if (fs.existsSync(schemaPath)) {
-      console.log('📄 Using schema file from:', schemaPath);
       schemaSQL = fs.readFileSync(schemaPath, 'utf8');
     } else {
-      console.log('⚠️  Schema file not found, using embedded schema...');
       schemaSQL = getEmbeddedSchema();
     }
 
-    // Run the schema
     await pool.query(schemaSQL);
+    console.log('✅ Schema created successfully');
 
-    console.log('✅ Database schema created successfully!');
-    
-    // Verify tables were created
-    const verifyQuery = `
+    // Verify tables
+    const result = await pool.query(`
       SELECT table_name 
       FROM information_schema.tables 
       WHERE table_schema = 'public' 
       ORDER BY table_name;
-    `;
-    const tables = await pool.query(verifyQuery);
-    console.log('📋 Created tables:', tables.rows.map(r => r.table_name).join(', '));
+    `);
+    
+    const tables = result.rows.map(r => r.table_name);
+    console.log('📋 Created tables:', tables.join(', '));
 
-    await pool.end();
+    res.json({
+      success: true,
+      message: 'Database migration completed successfully',
+      tables: tables
+    });
   } catch (error) {
-    console.error('❌ Migration failed:', error.message);
-    console.error('Full error:', error);
-    await pool.end();
-    throw error;
+    console.error('❌ Migration failed:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Migration failed',
+      error: error.message
+    });
   }
-}
+});
 
-// Embedded schema (fallback if file not found)
+// Check database status
+router.get('/db-status', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT table_name, 
+             (SELECT COUNT(*) FROM information_schema.columns 
+              WHERE table_schema = 'public' AND columns.table_name = tables.table_name) as column_count
+      FROM information_schema.tables 
+      WHERE table_schema = 'public' 
+      ORDER BY table_name;
+    `);
+    
+    res.json({
+      success: true,
+      tables: result.rows
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 function getEmbeddedSchema() {
   return `
 -- ديوان المعرفة (Diwan Al-Maarifa) Database Schema
+-- Arabic Knowledge Platform Database Structure
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Users Table
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     user_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     username VARCHAR(50) UNIQUE NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
@@ -96,7 +113,7 @@ CREATE TABLE users (
 );
 
 -- Categories Table
-CREATE TABLE categories (
+CREATE TABLE IF NOT EXISTS categories (
     category_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name_ar VARCHAR(100) NOT NULL,
     name_en VARCHAR(100),
@@ -109,7 +126,7 @@ CREATE TABLE categories (
 );
 
 -- Content Submissions Table
-CREATE TABLE content_submissions (
+CREATE TABLE IF NOT EXISTS content_submissions (
     submission_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     contributor_id UUID NOT NULL REFERENCES users(user_id),
     category_id UUID REFERENCES categories(category_id),
@@ -126,7 +143,7 @@ CREATE TABLE content_submissions (
 );
 
 -- Published Content Table
-CREATE TABLE published_content (
+CREATE TABLE IF NOT EXISTS published_content (
     content_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     submission_id UUID UNIQUE REFERENCES content_submissions(submission_id),
     category_id UUID REFERENCES categories(category_id),
@@ -146,7 +163,7 @@ CREATE TABLE published_content (
 );
 
 -- Workflow History Table
-CREATE TABLE workflow_history (
+CREATE TABLE IF NOT EXISTS workflow_history (
     history_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     submission_id UUID REFERENCES content_submissions(submission_id),
     reviewer_id UUID REFERENCES users(user_id),
@@ -158,7 +175,7 @@ CREATE TABLE workflow_history (
 );
 
 -- Notifications Table
-CREATE TABLE notifications (
+CREATE TABLE IF NOT EXISTS notifications (
     notification_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(user_id),
     type VARCHAR(50) NOT NULL,
@@ -170,7 +187,7 @@ CREATE TABLE notifications (
 );
 
 -- Analytics Events Table
-CREATE TABLE analytics_events (
+CREATE TABLE IF NOT EXISTS analytics_events (
     event_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     event_type VARCHAR(50) NOT NULL,
     user_id UUID REFERENCES users(user_id),
@@ -179,8 +196,8 @@ CREATE TABLE analytics_events (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Comments Table
-CREATE TABLE comments (
+-- Comments Table (optional, for future use)
+CREATE TABLE IF NOT EXISTS comments (
     comment_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     content_id UUID REFERENCES published_content(content_id),
     user_id UUID REFERENCES users(user_id),
@@ -191,7 +208,7 @@ CREATE TABLE comments (
 );
 
 -- User Sessions Table
-CREATE TABLE user_sessions (
+CREATE TABLE IF NOT EXISTS user_sessions (
     session_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(user_id),
     refresh_token VARCHAR(500) UNIQUE NOT NULL,
@@ -199,30 +216,30 @@ CREATE TABLE user_sessions (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Indexes
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_username ON users(username);
-CREATE INDEX idx_users_role ON users(role);
-CREATE INDEX idx_categories_slug ON categories(slug);
-CREATE INDEX idx_content_submissions_contributor ON content_submissions(contributor_id);
-CREATE INDEX idx_content_submissions_status ON content_submissions(submission_status);
-CREATE INDEX idx_published_content_slug ON published_content(slug);
-CREATE INDEX idx_published_content_category ON published_content(category_id);
-CREATE INDEX idx_published_content_author ON published_content(author_id);
-CREATE INDEX idx_published_content_published_at ON published_content(published_at DESC);
-CREATE INDEX idx_workflow_history_submission ON workflow_history(submission_id);
-CREATE INDEX idx_notifications_user ON notifications(user_id);
-CREATE INDEX idx_notifications_unread ON notifications(user_id, is_read) WHERE is_read = FALSE;
-CREATE INDEX idx_analytics_events_type ON analytics_events(event_type);
-CREATE INDEX idx_analytics_events_user ON analytics_events(user_id);
-CREATE INDEX idx_analytics_events_content ON analytics_events(content_id);
-CREATE INDEX idx_comments_content ON comments(content_id);
-CREATE INDEX idx_user_sessions_user ON user_sessions(user_id);
-CREATE INDEX idx_user_sessions_token ON user_sessions(refresh_token);
+-- Indexes for Performance
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+CREATE INDEX IF NOT EXISTS idx_categories_slug ON categories(slug);
+CREATE INDEX IF NOT EXISTS idx_content_submissions_contributor ON content_submissions(contributor_id);
+CREATE INDEX IF NOT EXISTS idx_content_submissions_status ON content_submissions(submission_status);
+CREATE INDEX IF NOT EXISTS idx_published_content_slug ON published_content(slug);
+CREATE INDEX IF NOT EXISTS idx_published_content_category ON published_content(category_id);
+CREATE INDEX IF NOT EXISTS idx_published_content_author ON published_content(author_id);
+CREATE INDEX IF NOT EXISTS idx_published_content_published_at ON published_content(published_at DESC);
+CREATE INDEX IF NOT EXISTS idx_workflow_history_submission ON workflow_history(submission_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id, is_read) WHERE is_read = FALSE;
+CREATE INDEX IF NOT EXISTS idx_analytics_events_type ON analytics_events(event_type);
+CREATE INDEX IF NOT EXISTS idx_analytics_events_user ON analytics_events(user_id);
+CREATE INDEX IF NOT EXISTS idx_analytics_events_content ON analytics_events(content_id);
+CREATE INDEX IF NOT EXISTS idx_comments_content ON comments(content_id);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_user ON user_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_token ON user_sessions(refresh_token);
 
 -- Full-text search indexes for Arabic content
-CREATE INDEX idx_published_content_title_ar_fts ON published_content USING gin(to_tsvector('arabic', title_ar));
-CREATE INDEX idx_published_content_content_ar_fts ON published_content USING gin(to_tsvector('arabic', content_ar));
+CREATE INDEX IF NOT EXISTS idx_published_content_title_ar_fts ON published_content USING gin(to_tsvector('arabic', title_ar));
+CREATE INDEX IF NOT EXISTS idx_published_content_content_ar_fts ON published_content USING gin(to_tsvector('arabic', content_ar));
 
 -- Triggers for updated_at timestamps
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -246,8 +263,9 @@ INSERT INTO categories (name_ar, name_en, slug, description_ar, description_en, 
 ('الأحياء', 'Biology', 'biology', 'علم دراسة الكائنات الحية', 'The study of living organisms', 3),
 ('الطاقة', 'Energy', 'energy', 'دراسة مصادر الطاقة وتطبيقاتها', 'Study of energy sources and applications', 4),
 ('الهندسة', 'Engineering', 'engineering', 'تطبيق العلوم في التصميم والبناء', 'Application of science in design and construction', 5),
-('الطبيعة', 'Nature', 'nature', 'دراسة العالم الطبيعي والبيئة', 'Study of the natural world and environment', 6);
+('الطبيعة', 'Nature', 'nature', 'دراسة العالم الطبيعي والبيئة', 'Study of the natural world and environment', 6)
+ON CONFLICT (slug) DO NOTHING;
   `;
 }
 
-module.exports = { runMigrations };
+module.exports = router;
