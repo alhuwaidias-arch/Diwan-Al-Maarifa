@@ -27,7 +27,7 @@ async function register(req, res) {
     
     // Check if user already exists
     const existingUser = await query(
-      'SELECT id FROM users WHERE email = $1',
+      'SELECT user_id FROM users WHERE email = $1',
       [email]
     );
     
@@ -45,19 +45,19 @@ async function register(req, res) {
     const result = await query(
       `INSERT INTO users (email, username, password_hash, full_name, role)
        VALUES ($1, $2, $3, $4, $5)
-       RETURNING id, email, username, full_name, role, created_at`,
+       RETURNING user_id, email, username, full_name, role, created_at`,
       [email, finalUsername, passwordHash, full_name, role]
     );
     
     const user = result.rows[0];
     
     // Generate token
-    const token = generateToken(user.id, user.email, user.role);
+    const token = generateToken(user.user_id, user.email, user.role);
     
     res.status(201).json({
       message: 'User registered successfully',
       user: {
-        id: user.id,
+        user_id: user.user_id,
         email: user.email,
         full_name: user.full_name,
         role: user.role,
@@ -84,7 +84,7 @@ async function login(req, res) {
     
     // Get user from database
     const result = await query(
-      `SELECT id, email, password_hash, full_name, role, status
+      `SELECT user_id, email, password_hash, full_name, role, status
        FROM users
        WHERE email = $1`,
       [email]
@@ -119,17 +119,17 @@ async function login(req, res) {
     
     // Update last login
     await query(
-      'UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1',
-      [user.id]
+      'UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE user_id = $1',
+      [user.user_id]
     );
     
     // Generate token
-    const token = generateToken(user.id, user.email, user.role);
+    const token = generateToken(user.user_id, user.email, user.role);
     
     res.json({
       message: 'Login successful',
       user: {
-        id: user.id,
+        user_id: user.user_id,
         email: user.email,
         full_name: user.full_name,
         role: user.role
@@ -167,7 +167,7 @@ async function refreshToken(req, res) {
     
     // Get user from database
     const result = await query(
-      'SELECT id, email, role, is_active FROM users WHERE id = $1',
+      'SELECT user_id, email, role, status FROM users WHERE user_id = $1',
       [decoded.userId]
     );
     
@@ -217,7 +217,7 @@ async function forgotPassword(req, res) {
     
     // Check if user exists
     const result = await query(
-      'SELECT id, email, full_name FROM users WHERE email = $1',
+      'SELECT user_id, email, full_name FROM users WHERE email = $1',
       [email]
     );
     
@@ -238,8 +238,8 @@ async function forgotPassword(req, res) {
     await query(
       `UPDATE users 
        SET password_reset_token = $1, password_reset_expires = $2
-       WHERE id = $3`,
-      [resetToken, resetExpiry, user.id]
+       WHERE user_id = $3`,
+      [resetToken, resetExpiry, user.user_id]
     );
     
     // TODO: Send email with reset link
@@ -268,7 +268,7 @@ async function resetPassword(req, res) {
     
     // Find user with valid reset token
     const result = await query(
-      `SELECT id FROM users
+      `SELECT user_id FROM users
        WHERE password_reset_token = $1
        AND password_reset_expires > CURRENT_TIMESTAMP`,
       [token]
@@ -292,8 +292,8 @@ async function resetPassword(req, res) {
        SET password_hash = $1,
            password_reset_token = NULL,
            password_reset_expires = NULL
-       WHERE id = $2`,
-      [passwordHash, user.id]
+       WHERE user_id = $2`,
+      [passwordHash, user.user_id]
     );
     
     res.json({
