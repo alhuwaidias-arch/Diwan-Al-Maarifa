@@ -83,7 +83,7 @@ async function getPublishedContent(req, res) {
     
   } catch (error) {
     console.error('Get published content error:', error);
-    res.status(500).json({ 
+    res.submission_status(500).json({ 
       error: 'Internal Server Error',
       message: 'Failed to get published content'
     });
@@ -105,12 +105,12 @@ async function getPublishedBySlug(req, res) {
        FROM content_submissions cs
        LEFT JOIN categories c ON cs.category_id = c.submission_id
        LEFT JOIN users u ON cs.author_id = u.submission_id
-       WHERE cs.slug = $1 AND cs.status = 'published'`,
+       WHERE cs.slug = $1 AND cs.submission_status = 'published'`,
       [slug]
     );
     
     if (result.rows.length === 0) {
-      return res.status(404).json({
+      return res.submission_status(404).json({
         error: 'Not Found',
         message: 'Content not found'
       });
@@ -128,7 +128,7 @@ async function getPublishedBySlug(req, res) {
     
   } catch (error) {
     console.error('Get published by slug error:', error);
-    res.status(500).json({ 
+    res.submission_status(500).json({ 
       error: 'Internal Server Error',
       message: 'Failed to get content'
     });
@@ -143,7 +143,7 @@ async function searchContent(req, res) {
     const { q, page = 1, limit = 20 } = req.query;
     
     if (!q || q.trim().length < 2) {
-      return res.status(400).json({
+      return res.submission_status(400).json({
         error: 'Bad Request',
         message: 'Search query must be at least 2 characters'
       });
@@ -160,7 +160,7 @@ async function searchContent(req, res) {
        FROM content_submissions cs
        LEFT JOIN categories c ON cs.category_id = c.submission_id
        LEFT JOIN users u ON cs.author_id = u.submission_id
-       WHERE cs.status = 'published'
+       WHERE cs.submission_status = 'published'
          AND to_tsvector('arabic', cs.title || ' ' || cs.content) @@ plainto_tsquery('arabic', $1)
        ORDER BY rank DESC, cs.published_at DESC
        LIMIT $2 OFFSET $3`,
@@ -175,7 +175,7 @@ async function searchContent(req, res) {
     
   } catch (error) {
     console.error('Search content error:', error);
-    res.status(500).json({ 
+    res.submission_status(500).json({ 
       error: 'Internal Server Error',
       message: 'Failed to search content'
     });
@@ -201,14 +201,14 @@ async function submitContent(req, res) {
       [title, slug, content, category_id, content_type, tags || [], authorId]
     );
     
-    res.status(201).json({
+    res.submission_status(201).json({
       message: 'Content submitted successfully',
       submission: result.rows[0]
     });
     
   } catch (error) {
     console.error('Submit content error:', error);
-    res.status(500).json({ 
+    res.submission_status(500).json({ 
       error: 'Internal Server Error',
       message: 'Failed to submit content'
     });
@@ -245,7 +245,7 @@ async function getUserSubmissions(req, res) {
     // Get submissions
     values.push(limit, offset);
     const result = await query(
-      `SELECT cs.submission_id, cs.title, cs.slug, cs.content_type, cs.status, cs.created_at, cs.updated_at,
+      `SELECT cs.submission_id, cs.title, cs.slug, cs.content_type, cs.submission_status, cs.created_at, cs.updated_at,
               c.name_ar as category_name_ar
        FROM content_submissions cs
        LEFT JOIN categories c ON cs.category_id = c.submission_id
@@ -267,7 +267,7 @@ async function getUserSubmissions(req, res) {
     
   } catch (error) {
     console.error('Get user submissions error:', error);
-    res.status(500).json({ 
+    res.submission_status(500).json({ 
       error: 'Internal Server Error',
       message: 'Failed to get submissions'
     });
@@ -305,7 +305,7 @@ async function getSubmissionById(req, res) {
     );
     
     if (result.rows.length === 0) {
-      return res.status(404).json({
+      return res.submission_status(404).json({
         error: 'Not Found',
         message: 'Submission not found'
       });
@@ -328,7 +328,7 @@ async function getSubmissionById(req, res) {
     
   } catch (error) {
     console.error('Get submission by ID error:', error);
-    res.status(500).json({ 
+    res.submission_status(500).json({ 
       error: 'Internal Server Error',
       message: 'Failed to get submission'
     });
@@ -351,15 +351,15 @@ async function updateSubmission(req, res) {
     );
     
     if (checkResult.rows.length === 0) {
-      return res.status(404).json({
+      return res.submission_status(404).json({
         error: 'Not Found',
         message: 'Submission not found'
       });
     }
     
     // Only allow editing draft submissions
-    if (checkResult.rows[0].status !== 'draft') {
-      return res.status(403).json({
+    if (checkResult.rows[0].submission_status !== 'draft') {
+      return res.submission_status(403).json({
         error: 'Forbidden',
         message: 'Can only edit draft submissions'
       });
@@ -401,7 +401,7 @@ async function updateSubmission(req, res) {
     }
     
     if (updates.length === 0) {
-      return res.status(400).json({
+      return res.submission_status(400).json({
         error: 'Bad Request',
         message: 'No fields to update'
       });
@@ -425,7 +425,7 @@ async function updateSubmission(req, res) {
     
   } catch (error) {
     console.error('Update submission error:', error);
-    res.status(500).json({ 
+    res.submission_status(500).json({ 
       error: 'Internal Server Error',
       message: 'Failed to update submission'
     });
@@ -447,15 +447,15 @@ async function deleteSubmission(req, res) {
     );
     
     if (checkResult.rows.length === 0) {
-      return res.status(404).json({
+      return res.submission_status(404).json({
         error: 'Not Found',
         message: 'Submission not found'
       });
     }
     
     // Only allow deleting draft submissions
-    if (checkResult.rows[0].status !== 'draft') {
-      return res.status(403).json({
+    if (checkResult.rows[0].submission_status !== 'draft') {
+      return res.submission_status(403).json({
         error: 'Forbidden',
         message: 'Can only delete draft submissions'
       });
@@ -469,7 +469,7 @@ async function deleteSubmission(req, res) {
     
   } catch (error) {
     console.error('Delete submission error:', error);
-    res.status(500).json({ 
+    res.submission_status(500).json({ 
       error: 'Internal Server Error',
       message: 'Failed to delete submission'
     });
@@ -505,7 +505,7 @@ async function getPendingReviews(req, res) {
     
     // Get submissions
     const result = await query(
-      `SELECT cs.submission_id, cs.title, cs.slug, cs.content_type, cs.status, cs.created_at,
+      `SELECT cs.submission_id, cs.title, cs.slug, cs.content_type, cs.submission_status, cs.created_at,
               c.name_ar as category_name_ar,
               u.full_name as author_name, u.email as author_email
        FROM content_submissions cs
@@ -529,7 +529,7 @@ async function getPendingReviews(req, res) {
     
   } catch (error) {
     console.error('Get pending reviews error:', error);
-    res.status(500).json({ 
+    res.submission_status(500).json({ 
       error: 'Internal Server Error',
       message: 'Failed to get pending reviews'
     });
@@ -558,7 +558,7 @@ async function submitReview(req, res) {
     
     if (submissionResult.rows.length === 0) {
       await client.query('ROLLBACK');
-      return res.status(404).json({
+      return res.submission_status(404).json({
         error: 'Not Found',
         message: 'Submission not found'
       });
@@ -567,17 +567,17 @@ async function submitReview(req, res) {
     const submission = submissionResult.rows[0];
     
     // Validate reviewer can review this submission
-    if (reviewerRole === 'content_auditor' && submission.status !== 'pending_content_review') {
+    if (reviewerRole === 'content_auditor' && submission.submission_status !== 'pending_content_review') {
       await client.query('ROLLBACK');
-      return res.status(403).json({
+      return res.submission_status(403).json({
         error: 'Forbidden',
         message: 'This submission is not pending content review'
       });
     }
     
-    if (reviewerRole === 'technical_auditor' && submission.status !== 'pending_technical_review') {
+    if (reviewerRole === 'technical_auditor' && submission.submission_status !== 'pending_technical_review') {
       await client.query('ROLLBACK');
-      return res.status(403).json({
+      return res.submission_status(403).json({
         error: 'Forbidden',
         message: 'This submission is not pending technical review'
       });
@@ -607,7 +607,7 @@ async function submitReview(req, res) {
     await client.query(
       `INSERT INTO workflow_history (submission_id, reviewer_id, from_status, to_status, decision, comments)
        VALUES ($1, $2, $3, $4, $5, $6)`,
-      [submission_id, reviewerId, submission.status, newStatus, decision, comments]
+      [submission_id, reviewerId, submission.submission_status, newStatus, decision, comments]
     );
     
     await client.query('COMMIT');
@@ -620,7 +620,7 @@ async function submitReview(req, res) {
   } catch (error) {
     await client.query('ROLLBACK');
     console.error('Submit review error:', error);
-    res.status(500).json({ 
+    res.submission_status(500).json({ 
       error: 'Internal Server Error',
       message: 'Failed to submit review'
     });
@@ -659,14 +659,14 @@ async function publishContent(req, res) {
     );
     
     if (checkResult.rows.length === 0) {
-      return res.status(404).json({
+      return res.submission_status(404).json({
         error: 'Not Found',
         message: 'Submission not found'
       });
     }
     
-    if (checkResult.rows[0].status !== 'approved') {
-      return res.status(403).json({
+    if (checkResult.rows[0].submission_status !== 'approved') {
+      return res.submission_status(403).json({
         error: 'Forbidden',
         message: 'Can only publish approved submissions'
       });
@@ -688,7 +688,7 @@ async function publishContent(req, res) {
     
   } catch (error) {
     console.error('Publish content error:', error);
-    res.status(500).json({ 
+    res.submission_status(500).json({ 
       error: 'Internal Server Error',
       message: 'Failed to publish content'
     });
@@ -733,7 +733,7 @@ async function updatePublishedContent(req, res) {
     }
     
     if (updates.length === 0) {
-      return res.status(400).json({
+      return res.submission_status(400).json({
         error: 'Bad Request',
         message: 'No fields to update'
       });
@@ -751,7 +751,7 @@ async function updatePublishedContent(req, res) {
     );
     
     if (result.rows.length === 0) {
-      return res.status(404).json({
+      return res.submission_status(404).json({
         error: 'Not Found',
         message: 'Published content not found'
       });
@@ -764,7 +764,7 @@ async function updatePublishedContent(req, res) {
     
   } catch (error) {
     console.error('Update published content error:', error);
-    res.status(500).json({ 
+    res.submission_status(500).json({ 
       error: 'Internal Server Error',
       message: 'Failed to update published content'
     });
@@ -787,7 +787,7 @@ async function unpublishContent(req, res) {
     );
     
     if (result.rows.length === 0) {
-      return res.status(404).json({
+      return res.submission_status(404).json({
         error: 'Not Found',
         message: 'Published content not found'
       });
@@ -800,7 +800,7 @@ async function unpublishContent(req, res) {
     
   } catch (error) {
     console.error('Unpublish content error:', error);
-    res.status(500).json({ 
+    res.submission_status(500).json({ 
       error: 'Internal Server Error',
       message: 'Failed to unpublish content'
     });

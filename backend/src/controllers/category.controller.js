@@ -10,7 +10,7 @@ async function getAllCategories(req, res) {
       `SELECT c.category_id, c.name_ar, c.name_en, c.slug, c.description, c.icon, c.color, c.display_order,
               COUNT(cs.submission_id) as content_count
        FROM categories c
-       LEFT JOIN content_submissions cs ON c.category_id = cs.category_id AND cs.status = 'published'
+       LEFT JOIN content_submissions cs ON c.category_id = cs.category_id AND cs.submission_status = 'published'
        GROUP BY c.category_id
        ORDER BY c.display_order ASC, c.name_ar ASC`
     );
@@ -39,7 +39,7 @@ async function getCategoryBySlug(req, res) {
       `SELECT c.category_id, c.name_ar, c.name_en, c.slug, c.description, c.icon, c.color,
               COUNT(cs.submission_id) as content_count
        FROM categories c
-       LEFT JOIN content_submissions cs ON c.category_id = cs.category_id AND cs.status = 'published'
+       LEFT JOIN content_submissions cs ON c.category_id = cs.category_id AND cs.submission_status = 'published'
        WHERE c.slug = $1
        GROUP BY c.category_id`,
       [slug]
