@@ -7,7 +7,7 @@ const { query } = require('../database/connection');
 async function getAllCategories(req, res) {
   try {
     const result = await query(
-      `SELECT c.category_id, c.name_ar, c.name_en, c.slug, c.description, c.icon, c.color, c.display_order,
+      `SELECT c.category_id, c.name_ar, c.name_en, c.slug, c.description_ar, c.description_en, c.display_order,
               COUNT(cs.submission_id) as content_count
        FROM categories c
        LEFT JOIN content_submissions cs ON c.category_id = cs.category_id AND cs.submission_status = 'published'
@@ -36,7 +36,7 @@ async function getCategoryBySlug(req, res) {
     const { slug } = req.params;
     
     const result = await query(
-      `SELECT c.category_id, c.name_ar, c.name_en, c.slug, c.description, c.icon, c.color,
+      `SELECT c.category_id, c.name_ar, c.name_en, c.slug, c.description_ar, c.description_en,
               COUNT(cs.submission_id) as content_count
        FROM categories c
        LEFT JOIN content_submissions cs ON c.category_id = cs.category_id AND cs.submission_status = 'published'
