@@ -58,13 +58,13 @@ async function getPublishedContent(req, res) {
     // Get content
     values.push(limit, offset);
     const result = await query(
-      `SELECT cs.id, cs.title, cs.slug, cs.content, cs.content_type, cs.tags,
+      `SELECT cs.submission_id, cs.title, cs.slug, cs.content, cs.content_type, cs.tags,
               cs.published_at, cs.view_count,
               c.name_ar as category_name_ar, c.name_en as category_name_en,
               u.full_name as author_name, u.username as author_username
        FROM content_submissions cs
-       LEFT JOIN categories c ON cs.category_id = c.id
-       LEFT JOIN users u ON cs.author_id = u.id
+       LEFT JOIN categories c ON cs.category_id = c.submission_id
+       LEFT JOIN users u ON cs.author_id = u.submission_id
        WHERE ${whereClause}
        ORDER BY cs.published_at DESC
        LIMIT $${paramCount} OFFSET $${paramCount + 1}`,
@@ -98,13 +98,13 @@ async function getPublishedBySlug(req, res) {
     const { slug } = req.params;
     
     const result = await query(
-      `SELECT cs.id, cs.title, cs.slug, cs.content, cs.content_type, cs.tags,
+      `SELECT cs.submission_id, cs.title, cs.slug, cs.content, cs.content_type, cs.tags,
               cs.published_at, cs.view_count,
-              c.id as category_id, c.name_ar as category_name_ar, c.name_en as category_name_en, c.slug as category_slug,
-              u.id as author_id, u.full_name as author_name, u.username as author_username, u.bio as author_bio
+              c.submission_id as category_id, c.name_ar as category_name_ar, c.name_en as category_name_en, c.slug as category_slug,
+              u.submission_id as author_id, u.full_name as author_name, u.username as author_username, u.bio as author_bio
        FROM content_submissions cs
-       LEFT JOIN categories c ON cs.category_id = c.id
-       LEFT JOIN users u ON cs.author_id = u.id
+       LEFT JOIN categories c ON cs.category_id = c.submission_id
+       LEFT JOIN users u ON cs.author_id = u.submission_id
        WHERE cs.slug = $1 AND cs.status = 'published'`,
       [slug]
     );
@@ -118,8 +118,8 @@ async function getPublishedBySlug(req, res) {
     
     // Increment view count
     await query(
-      'UPDATE content_submissions SET view_count = view_count + 1 WHERE id = $1',
-      [result.rows[0].id]
+      'UPDATE content_submissions SET view_count = view_count + 1 WHERE submission_id = $1',
+      [result.rows[0].submission_id]
     );
     
     res.json({
@@ -153,13 +153,13 @@ async function searchContent(req, res) {
     
     // Full-text search using PostgreSQL
     const result = await query(
-      `SELECT cs.id, cs.title, cs.slug, cs.content_type, cs.published_at,
+      `SELECT cs.submission_id, cs.title, cs.slug, cs.content_type, cs.published_at,
               c.name_ar as category_name_ar,
               u.full_name as author_name,
               ts_rank(to_tsvector('arabic', cs.title || ' ' || cs.content), plainto_tsquery('arabic', $1)) as rank
        FROM content_submissions cs
-       LEFT JOIN categories c ON cs.category_id = c.id
-       LEFT JOIN users u ON cs.author_id = u.id
+       LEFT JOIN categories c ON cs.category_id = c.submission_id
+       LEFT JOIN users u ON cs.author_id = u.submission_id
        WHERE cs.status = 'published'
          AND to_tsvector('arabic', cs.title || ' ' || cs.content) @@ plainto_tsquery('arabic', $1)
        ORDER BY rank DESC, cs.published_at DESC
@@ -188,7 +188,7 @@ async function searchContent(req, res) {
 async function submitContent(req, res) {
   try {
     const { title, content, category_id, content_type, tags } = req.body;
-    const authorId = req.user.id;
+    const authorId = req.user.submission_id;
     
     // Generate slug from title
     const slug = generateSlug(title) + '-' + Date.now();
@@ -197,7 +197,7 @@ async function submitContent(req, res) {
       `INSERT INTO content_submissions 
        (title, slug, content, category_id, content_type, tags, author_id, status)
        VALUES ($1, $2, $3, $4, $5, $6, $7, 'draft')
-       RETURNING id, title, slug, content_type, status, created_at`,
+       RETURNING submission_id, title, slug, content_type, status, created_at`,
       [title, slug, content, category_id, content_type, tags || [], authorId]
     );
     
@@ -221,7 +221,7 @@ async function submitContent(req, res) {
 async function getUserSubmissions(req, res) {
   try {
     const { page = 1, limit = 20, status } = req.query;
-    const authorId = req.user.id;
+    const authorId = req.user.submission_id;
     const offset = (page - 1) * limit;
     
     let whereClause = 'WHERE author_id = $1';
@@ -245,10 +245,10 @@ async function getUserSubmissions(req, res) {
     // Get submissions
     values.push(limit, offset);
     const result = await query(
-      `SELECT cs.id, cs.title, cs.slug, cs.content_type, cs.status, cs.created_at, cs.updated_at,
+      `SELECT cs.submission_id, cs.title, cs.slug, cs.content_type, cs.status, cs.created_at, cs.updated_at,
               c.name_ar as category_name_ar
        FROM content_submissions cs
-       LEFT JOIN categories c ON cs.category_id = c.id
+       LEFT JOIN categories c ON cs.category_id = c.submission_id
        ${whereClause}
        ORDER BY cs.created_at DESC
        LIMIT $${paramCount} OFFSET $${paramCount + 1}`,
@@ -279,14 +279,14 @@ async function getUserSubmissions(req, res) {
  */
 async function getSubmissionById(req, res) {
   try {
-    const { id } = req.params;
-    const userId = req.user.id;
+    const { submission_id } = req.params;
+    const userId = req.user.submission_id;
     const userRole = req.user.role;
     
     // Contributors can only see their own submissions
     // Auditors and admins can see all
-    let whereClause = 'WHERE cs.id = $1';
-    const values = [id];
+    let whereClause = 'WHERE cs.submission_id = $1';
+    const values = [submission_id];
     
     if (userRole === 'contributor') {
       whereClause += ' AND cs.author_id = $2';
@@ -298,8 +298,8 @@ async function getSubmissionById(req, res) {
               c.name_ar as category_name_ar, c.name_en as category_name_en,
               u.full_name as author_name, u.email as author_email
        FROM content_submissions cs
-       LEFT JOIN categories c ON cs.category_id = c.id
-       LEFT JOIN users u ON cs.author_id = u.id
+       LEFT JOIN categories c ON cs.category_id = c.submission_id
+       LEFT JOIN users u ON cs.author_id = u.submission_id
        ${whereClause}`,
       values
     );
@@ -315,10 +315,10 @@ async function getSubmissionById(req, res) {
     const historyResult = await query(
       `SELECT wh.*, u.full_name as reviewer_name, u.role as reviewer_role
        FROM workflow_history wh
-       LEFT JOIN users u ON wh.reviewer_id = u.id
+       LEFT JOIN users u ON wh.reviewer_id = u.submission_id
        WHERE wh.submission_id = $1
        ORDER BY wh.created_at DESC`,
-      [id]
+      [submission_id]
     );
     
     res.json({
@@ -340,14 +340,14 @@ async function getSubmissionById(req, res) {
  */
 async function updateSubmission(req, res) {
   try {
-    const { id } = req.params;
+    const { submission_id } = req.params;
     const { title, content, category_id, tags } = req.body;
-    const authorId = req.user.id;
+    const authorId = req.user.submission_id;
     
     // Check if submission exists and is owned by user
     const checkResult = await query(
-      'SELECT status FROM content_submissions WHERE id = $1 AND author_id = $2',
-      [id, authorId]
+      'SELECT status FROM content_submissions WHERE submission_id = $1 AND author_id = $2',
+      [submission_id, authorId]
     );
     
     if (checkResult.rows.length === 0) {
@@ -408,13 +408,13 @@ async function updateSubmission(req, res) {
     }
     
     updates.push(`updated_at = CURRENT_TIMESTAMP`);
-    values.push(id);
+    values.push(submission_id);
     
     const result = await query(
       `UPDATE content_submissions
        SET ${updates.join(', ')}
-       WHERE id = $${paramCount}
-       RETURNING id, title, slug, content_type, status, updated_at`,
+       WHERE submission_id = $${paramCount}
+       RETURNING submission_id, title, slug, content_type, status, updated_at`,
       values
     );
     
@@ -437,13 +437,13 @@ async function updateSubmission(req, res) {
  */
 async function deleteSubmission(req, res) {
   try {
-    const { id } = req.params;
-    const authorId = req.user.id;
+    const { submission_id } = req.params;
+    const authorId = req.user.submission_id;
     
     // Check if submission exists and is owned by user
     const checkResult = await query(
-      'SELECT status FROM content_submissions WHERE id = $1 AND author_id = $2',
-      [id, authorId]
+      'SELECT status FROM content_submissions WHERE submission_id = $1 AND author_id = $2',
+      [submission_id, authorId]
     );
     
     if (checkResult.rows.length === 0) {
@@ -461,7 +461,7 @@ async function deleteSubmission(req, res) {
       });
     }
     
-    await query('DELETE FROM content_submissions WHERE id = $1', [id]);
+    await query('DELETE FROM content_submissions WHERE submission_id = $1', [submission_id]);
     
     res.json({
       message: 'Submission deleted successfully'
@@ -505,12 +505,12 @@ async function getPendingReviews(req, res) {
     
     // Get submissions
     const result = await query(
-      `SELECT cs.id, cs.title, cs.slug, cs.content_type, cs.status, cs.created_at,
+      `SELECT cs.submission_id, cs.title, cs.slug, cs.content_type, cs.status, cs.created_at,
               c.name_ar as category_name_ar,
               u.full_name as author_name, u.email as author_email
        FROM content_submissions cs
-       LEFT JOIN categories c ON cs.category_id = c.id
-       LEFT JOIN users u ON cs.author_id = u.id
+       LEFT JOIN categories c ON cs.category_id = c.submission_id
+       LEFT JOIN users u ON cs.author_id = u.submission_id
        WHERE ${statusCondition}
        ORDER BY cs.created_at ASC
        LIMIT $1 OFFSET $2`,
@@ -545,15 +545,15 @@ async function submitReview(req, res) {
   try {
     await client.query('BEGIN');
     
-    const { id } = req.params;
+    const { submission_id } = req.params;
     const { decision, comments } = req.body;
-    const reviewerId = req.user.id;
+    const reviewerId = req.user.submission_id;
     const reviewerRole = req.user.role;
     
     // Get submission
     const submissionResult = await client.query(
-      'SELECT status, author_id FROM content_submissions WHERE id = $1',
-      [id]
+      'SELECT status, author_id FROM content_submissions WHERE submission_id = $1',
+      [submission_id]
     );
     
     if (submissionResult.rows.length === 0) {
@@ -599,15 +599,15 @@ async function submitReview(req, res) {
     
     // Update submission status
     await client.query(
-      'UPDATE content_submissions SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-      [newStatus, id]
+      'UPDATE content_submissions SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE submission_id = $2',
+      [newStatus, submission_id]
     );
     
     // Record in workflow history
     await client.query(
       `INSERT INTO workflow_history (submission_id, reviewer_id, from_status, to_status, decision, comments)
        VALUES ($1, $2, $3, $4, $5, $6)`,
-      [id, reviewerId, submission.status, newStatus, decision, comments]
+      [submission_id, reviewerId, submission.status, newStatus, decision, comments]
     );
     
     await client.query('COMMIT');
@@ -650,12 +650,12 @@ async function rejectContent(req, res) {
  */
 async function publishContent(req, res) {
   try {
-    const { id } = req.params;
+    const { submission_id } = req.params;
     
     // Check if submission is approved
     const checkResult = await query(
-      'SELECT status FROM content_submissions WHERE id = $1',
-      [id]
+      'SELECT status FROM content_submissions WHERE submission_id = $1',
+      [submission_id]
     );
     
     if (checkResult.rows.length === 0) {
@@ -676,9 +676,9 @@ async function publishContent(req, res) {
     const result = await query(
       `UPDATE content_submissions
        SET status = 'published', published_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $1
-       RETURNING id, title, slug, status, published_at`,
-      [id]
+       WHERE submission_id = $1
+       RETURNING submission_id, title, slug, status, published_at`,
+      [submission_id]
     );
     
     res.json({
@@ -700,7 +700,7 @@ async function publishContent(req, res) {
  */
 async function updatePublishedContent(req, res) {
   try {
-    const { id } = req.params;
+    const { submission_id } = req.params;
     const { title, content, category_id, tags } = req.body;
     
     // Build update query
@@ -740,13 +740,13 @@ async function updatePublishedContent(req, res) {
     }
     
     updates.push(`updated_at = CURRENT_TIMESTAMP`);
-    values.push(id);
+    values.push(submission_id);
     
     const result = await query(
       `UPDATE content_submissions
        SET ${updates.join(', ')}
-       WHERE id = $${paramCount} AND status = 'published'
-       RETURNING id, title, slug, updated_at`,
+       WHERE submission_id = $${paramCount} AND status = 'published'
+       RETURNING submission_id, title, slug, updated_at`,
       values
     );
     
@@ -776,14 +776,14 @@ async function updatePublishedContent(req, res) {
  */
 async function unpublishContent(req, res) {
   try {
-    const { id } = req.params;
+    const { submission_id } = req.params;
     
     const result = await query(
       `UPDATE content_submissions
        SET status = 'draft', published_at = NULL, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $1 AND status = 'published'
-       RETURNING id, title, status`,
-      [id]
+       WHERE submission_id = $1 AND status = 'published'
+       RETURNING submission_id, title, status`,
+      [submission_id]
     );
     
     if (result.rows.length === 0) {

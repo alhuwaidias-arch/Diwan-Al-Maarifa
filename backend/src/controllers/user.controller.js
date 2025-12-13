@@ -25,7 +25,7 @@ async function getProfile(req, res) {
 async function updateProfile(req, res) {
   try {
     const { full_name, bio, avatar_url } = req.body;
-    const userId = req.user.id;
+    const userId = req.user.user_id;
     
     // Build update query dynamically based on provided fields
     const updates = [];
@@ -66,8 +66,8 @@ async function updateProfile(req, res) {
     const result = await query(
       `UPDATE users 
        SET ${updates.join(', ')}
-       WHERE id = $${paramCount}
-       RETURNING id, email, username, full_name, bio, avatar_url, role, status, created_at, updated_at`,
+       WHERE user_id = $${paramCount}
+       RETURNING user_id, email, username, full_name, bio, avatar_url, role, status, created_at, updated_at`,
       values
     );
     
@@ -137,7 +137,7 @@ async function getAllUsers(req, res) {
     // Get users
     values.push(limit, offset);
     const result = await query(
-      `SELECT id, email, username, full_name, role, status, created_at, last_login
+      `SELECT user_id, email, username, full_name, role, status, created_at, last_login
        FROM users
        ${whereClause}
        ORDER BY created_at DESC
@@ -169,14 +169,14 @@ async function getAllUsers(req, res) {
  */
 async function getUserById(req, res) {
   try {
-    const { id } = req.params;
+    const { user_id } = req.params;
     
     const result = await query(
-      `SELECT id, email, username, full_name, bio, avatar_url, role, status, 
+      `SELECT user_id, email, username, full_name, bio, avatar_url, role, status, 
               email_verified, created_at, updated_at, last_login
        FROM users
-       WHERE id = $1`,
-      [id]
+       WHERE user_id = $1`,
+      [user_id]
     );
     
     if (result.rows.length === 0) {
@@ -192,8 +192,8 @@ async function getUserById(req, res) {
         (SELECT COUNT(*) FROM content_submissions WHERE author_id = $1) as total_submissions,
         (SELECT COUNT(*) FROM content_submissions WHERE author_id = $1 AND status = 'published') as published_count,
         (SELECT COUNT(*) FROM workflow_history WHERE reviewer_id = $1) as reviews_count
-       FROM users WHERE id = $1`,
-      [id]
+       FROM users WHERE user_id = $1`,
+      [user_id]
     );
     
     res.json({
@@ -219,7 +219,7 @@ async function getUserById(req, res) {
  */
 async function updateUserRole(req, res) {
   try {
-    const { id } = req.params;
+    const { user_id } = req.params;
     const { role } = req.body;
     
     // Validate role
@@ -232,7 +232,7 @@ async function updateUserRole(req, res) {
     }
     
     // Prevent self-demotion from admin
-    if (req.user.id === id && req.user.role === 'admin' && role !== 'admin') {
+    if (req.user.user_id === user_id && req.user.role === 'admin' && role !== 'admin') {
       return res.status(403).json({
         error: 'Forbidden',
         message: 'Cannot change your own admin role'
@@ -242,9 +242,9 @@ async function updateUserRole(req, res) {
     const result = await query(
       `UPDATE users
        SET role = $1, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $2
-       RETURNING id, email, username, full_name, role, status`,
-      [role, id]
+       WHERE user_id = $2
+       RETURNING user_id, email, username, full_name, role, status`,
+      [role, user_id]
     );
     
     if (result.rows.length === 0) {
@@ -273,10 +273,10 @@ async function updateUserRole(req, res) {
  */
 async function deleteUser(req, res) {
   try {
-    const { id } = req.params;
+    const { user_id } = req.params;
     
     // Prevent self-deletion
-    if (req.user.id === id) {
+    if (req.user.user_id === user_id) {
       return res.status(403).json({
         error: 'Forbidden',
         message: 'Cannot delete your own account'
@@ -285,8 +285,8 @@ async function deleteUser(req, res) {
     
     // Check if user exists
     const userCheck = await query(
-      'SELECT id, email FROM users WHERE id = $1',
-      [id]
+      'SELECT user_id, email FROM users WHERE user_id = $1',
+      [user_id]
     );
     
     if (userCheck.rows.length === 0) {
@@ -300,14 +300,14 @@ async function deleteUser(req, res) {
     await query(
       `UPDATE users
        SET status = 'deleted', updated_at = CURRENT_TIMESTAMP
-       WHERE id = $1`,
-      [id]
+       WHERE user_id = $1`,
+      [user_id]
     );
     
     res.json({
       message: 'User deleted successfully',
       user: {
-        id: userCheck.rows[0].id,
+        user_id: userCheck.rows[0].user_id,
         email: userCheck.rows[0].email
       }
     });
@@ -327,7 +327,7 @@ async function deleteUser(req, res) {
 async function changePassword(req, res) {
   try {
     const { current_password, new_password } = req.body;
-    const userId = req.user.id;
+    const userId = req.user.user_id;
     
     // Validate input
     if (!current_password || !new_password) {
@@ -339,7 +339,7 @@ async function changePassword(req, res) {
     
     // Get current password hash
     const result = await query(
-      'SELECT password_hash FROM users WHERE id = $1',
+      'SELECT password_hash FROM users WHERE user_id = $1',
       [userId]
     );
     
@@ -367,7 +367,7 @@ async function changePassword(req, res) {
     await query(
       `UPDATE users
        SET password_hash = $1, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $2`,
+       WHERE user_id = $2`,
       [newPasswordHash, userId]
     );
     
