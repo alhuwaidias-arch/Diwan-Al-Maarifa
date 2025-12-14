@@ -45,9 +45,26 @@
                         <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#newsletterModal">
                             <i class="fas fa-envelope"></i> انضم إلينا
                         </button>
-                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#knowledgeModal">
+                        <button class="btn btn-primary d-none" id="shareKnowledgeBtn" data-bs-toggle="modal" data-bs-target="#knowledgeModal">
                             <i class="fas fa-share-alt"></i> شارك معرفتك
                         </button>
+                        <!-- Login Button (shown when not authenticated) -->
+                        <button class="btn btn-primary" id="loginBtn" data-bs-toggle="modal" data-bs-target="#loginModal">
+                            <i class="fas fa-sign-in-alt"></i> تسجيل الدخول
+                        </button>
+                        <!-- User Menu (shown when authenticated) -->
+                        <div class="dropdown d-none" id="userMenu">
+                            <button class="btn btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                <i class="fas fa-user"></i> <span id="userName">المستخدم</span>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li><a class="dropdown-item" href="my-submissions.html"><i class="fas fa-file-alt me-2"></i>مشاركاتي</a></li>
+                                <li><a class="dropdown-item" href="my-bookmarks.html"><i class="fas fa-bookmark me-2"></i>المفضلة</a></li>
+                                <li><a class="dropdown-item" href="profile.html"><i class="fas fa-user-cog me-2"></i>الإعدادات</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="#" id="logoutBtn"><i class="fas fa-sign-out-alt me-2"></i>تسجيل الخروج</a></li>
+                            </ul>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -470,40 +487,35 @@
                     <form id="knowledgeForm">
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label for="knowledgeName" class="form-label">الاسم <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="knowledgeName" required>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label for="knowledgeEmail" class="form-label">البريد الإلكتروني <span class="text-danger">*</span></label>
-                                <input type="email" class="form-control" id="knowledgeEmail" required>
-                            </div>
-                        </div>
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
                                 <label for="knowledgeField" class="form-label">مجال المعرفة <span class="text-danger">*</span></label>
                                 <select class="form-select" id="knowledgeField" required>
                                     <option value="">اختر المجال...</option>
-                                    <option value="الفيزياء">الفيزياء</option>
-                                    <option value="الكيمياء">الكيمياء</option>
-                                    <option value="الأحياء">الأحياء</option>
-                                    <option value="الطاقة">الطاقة</option>
-                                    <option value="الهندسة">الهندسة</option>
-                                    <option value="الطبيعة">الطبيعة</option>
                                 </select>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label for="knowledgeType" class="form-label">نوع المشاركة <span class="text-danger">*</span></label>
                                 <select class="form-select" id="knowledgeType" required>
                                     <option value="">اختر النوع...</option>
-                                    <option value="مقال">مقال</option>
-                                    <option value="مصطلح">مصطلح</option>
+                                    <option value="article">مقال</option>
+                                    <option value="term">مصطلح</option>
                                 </select>
                             </div>
                         </div>
                         <div class="mb-3">
-                            <label for="knowledgeFile" class="form-label">إرفاق الملف <span class="text-muted">(اختياري)</span></label>
-                            <input type="file" class="form-control" id="knowledgeFile" accept=".pdf,.doc,.docx,.txt">
-                            <div class="form-text">الصيغ المدعومة: PDF, Word, TXT (الحد الأقصى: 10MB)</div>
+                            <label for="knowledgeTitleAr" class="form-label">العنوان (عربي) <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="knowledgeTitleAr" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="knowledgeTitleEn" class="form-label">العنوان (إنجليزي) <span class="text-muted">(اختياري)</span></label>
+                            <input type="text" class="form-control" id="knowledgeTitleEn">
+                        </div>
+                        <div class="mb-3">
+                            <label for="knowledgeContentAr" class="form-label">المحتوى (عربي) <span class="text-danger">*</span></label>
+                            <textarea class="form-control" id="knowledgeContentAr" rows="6" required></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="knowledgeContentEn" class="form-label">المحتوى (إنجليزي) <span class="text-muted">(اختياري)</span></label>
+                            <textarea class="form-control" id="knowledgeContentEn" rows="6"></textarea>
                         </div>
                         <div class="mb-3">
                             <label for="knowledgeNotes" class="form-label">ملاحظات إضافية <span class="text-muted">(اختياري)</span></label>
@@ -519,10 +531,113 @@
         </div>
     </div>
 
+    <!-- Login Modal -->
+    <div class="modal fade" id="loginModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-sign-in-alt me-2"></i>تسجيل الدخول</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="loginForm">
+                        <div class="mb-3">
+                            <label for="loginEmail" class="form-label">البريد الإلكتروني</label>
+                            <input type="email" class="form-control" id="loginEmail" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="loginPassword" class="form-label">كلمة المرور</label>
+                            <input type="password" class="form-control" id="loginPassword" required>
+                        </div>
+                        <div class="mb-3 text-end">
+                            <a href="#" data-bs-toggle="modal" data-bs-target="#forgotPasswordModal" data-bs-dismiss="modal">نسيت كلمة المرور؟</a>
+                        </div>
+                        <div id="loginMessage" class="alert d-none" role="alert"></div>
+                        <button type="submit" class="btn btn-primary w-100" id="loginSubmitBtn">
+                            <i class="fas fa-sign-in-alt me-2"></i>تسجيل الدخول
+                        </button>
+                        <div class="text-center mt-3">
+                            <p>ليس لديك حساب؟ <a href="#" data-bs-toggle="modal" data-bs-target="#registerModal" data-bs-dismiss="modal">إنشاء حساب جديد</a></p>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Register Modal -->
+    <div class="modal fade" id="registerModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-user-plus me-2"></i>إنشاء حساب جديد</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="registerForm">
+                        <div class="mb-3">
+                            <label for="registerName" class="form-label">الاسم الكامل</label>
+                            <input type="text" class="form-control" id="registerName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="registerEmail" class="form-label">البريد الإلكتروني</label>
+                            <input type="email" class="form-control" id="registerEmail" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="registerPassword" class="form-label">كلمة المرور</label>
+                            <input type="password" class="form-control" id="registerPassword" required minlength="8">
+                            <div class="form-text">يجب أن تكون 8 أحرف على الأقل</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="registerConfirmPassword" class="form-label">تأكيد كلمة المرور</label>
+                            <input type="password" class="form-control" id="registerConfirmPassword" required minlength="8">
+                        </div>
+                        <div id="registerMessage" class="alert d-none" role="alert"></div>
+                        <button type="submit" class="btn btn-primary w-100" id="registerSubmitBtn">
+                            <i class="fas fa-user-plus me-2"></i>إنشاء حساب
+                        </button>
+                        <div class="text-center mt-3">
+                            <p>لديك حساب بالفعل؟ <a href="#" data-bs-toggle="modal" data-bs-target="#loginModal" data-bs-dismiss="modal">تسجيل الدخول</a></p>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Forgot Password Modal -->
+    <div class="modal fade" id="forgotPasswordModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-key me-2"></i>إعادة تعيين كلمة المرور</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="forgotPasswordForm">
+                        <div class="mb-3">
+                            <label for="forgotEmail" class="form-label">البريد الإلكتروني</label>
+                            <input type="email" class="form-control" id="forgotEmail" required>
+                            <div class="form-text">سنرسل لك رابط إعادة تعيين كلمة المرور</div>
+                        </div>
+                        <div id="forgotMessage" class="alert d-none" role="alert"></div>
+                        <button type="submit" class="btn btn-primary w-100" id="forgotSubmitBtn">
+                            <i class="fas fa-paper-plane me-2"></i>إرسال
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- API Client and Authentication -->
+    <script src="api-client.js"></script>
+    <script src="auth.js"></script>
+    <!-- Other Scripts -->
     <script src="search.js"></script>
     <script src="script.js"></script>
-    <script src="forms.js"></script>
+    <script src="forms-backend.js"></script>
 </body>
 </html>
 
