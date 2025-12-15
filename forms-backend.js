@@ -24,9 +24,9 @@ document.getElementById('knowledgeForm')?.addEventListener('submit', async funct
     const field = document.getElementById('knowledgeField').value;
     const contributionType = document.getElementById('knowledgeType').value;
     const titleAr = document.getElementById('knowledgeTitleAr').value.trim();
-    const titleEn = document.getElementById('knowledgeTitleEn')?.value.trim() || '';
+    const titleEn = ''; // English title removed - Arabic only platform
     const contentAr = document.getElementById('knowledgeContentAr').value.trim();
-    const contentEn = document.getElementById('knowledgeContentEn')?.value.trim() || '';
+    const contentEn = ''; // English content removed - Arabic only platform
     const notes = document.getElementById('knowledgeNotes')?.value.trim() || '';
     
     // Disable button and show loading
