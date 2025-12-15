@@ -386,3 +386,9 @@ const apiClient = new DiwanAPIClient();
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = { DiwanAPIClient, apiClient };
 }
+
+// Expose to global window object for browser use
+if (typeof window !== 'undefined') {
+    window.DiowanAPI = apiClient;
+    window.DiwanAPIClient = DiwanAPIClient;
+}
