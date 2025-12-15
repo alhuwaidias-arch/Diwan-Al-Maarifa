@@ -515,6 +515,21 @@
                             <label for="knowledgeNotes" class="form-label">ملاحظات إضافية <span class="text-muted">(اختياري)</span></label>
                             <textarea class="form-control" id="knowledgeNotes" rows="3" placeholder="أي معلومات إضافية تريد مشاركتها..."></textarea>
                         </div>
+
+                        <!-- File Upload Section -->
+                        <div class="mb-3">
+                            <label class="form-label">إرفاق ملفات <span class="text-muted">(اختياري)</span></label>
+                            <div class="file-upload-area" id="fileUploadArea">
+                                <div class="file-drop-zone" id="fileDropZone">
+                                    <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
+                                    <p class="mb-2">اسحب الملفات هنا أو انقر للاختيار</p>
+                                    <p class="text-muted small">الصور: JPG, PNG, WebP (حتى 10 ميجابايت)</p>
+                                    <p class="text-muted small">المستندات: PDF, DOCX (حتى 10 ميجابايت)</p>
+                                    <input type="file" id="fileInput" multiple accept="image/*,.pdf,.docx" style="display: none;">
+                                </div>
+                                <div class="file-preview-container mt-3" id="filePreviewContainer" style="display: none;"></div>
+                            </div>
+                        </div>
                         <div id="knowledgeMessage" class="alert d-none" role="alert"></div>
                         <button type="submit" class="btn btn-primary w-100" id="knowledgeSubmitBtn">
                             <i class="fas fa-paper-plane me-2"></i>إرسال المشاركة
@@ -628,6 +643,7 @@
     <!-- API Client and Authentication -->
     <script src="api-client.js?v=20251215007"></script>
     <script src="auth.js?v=20251215001"></script>
+    <script src="file-upload.js?v=20251215001"></script>
     <!-- Other Scripts -->
     <script src="search.js"></script>
     <script src="script.js"></script>

@@ -82,9 +82,13 @@ class DiwanAPIClient {
     async request(endpoint, options = {}) {
         const url = `${this.baseURL}${endpoint}`;
         const headers = {
-            'Content-Type': 'application/json',
             ...options.headers
         };
+
+        // Only set Content-Type for non-FormData requests
+        if (!(options.body instanceof FormData)) {
+            headers['Content-Type'] = 'application/json';
+        }
 
         // Add auth token if available
         const token = this.getToken();

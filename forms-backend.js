@@ -35,6 +35,12 @@ document.getElementById('knowledgeForm')?.addEventListener('submit', async funct
     messageDiv.classList.add('d-none');
     
     try {
+        // First, upload files if any
+        let uploadedFiles = [];
+        if (window.fileUploadHandler && window.fileUploadHandler.files.length > 0) {
+            uploadedFiles = await window.fileUploadHandler.uploadFiles();
+        }
+        
         const contentData = {
             category_id: field,
             title_ar: titleAr,
@@ -47,8 +53,18 @@ document.getElementById('knowledgeForm')?.addEventListener('submit', async funct
         
         const response = await apiClient.submitContent(contentData);
         
+        // Link uploaded files to content if any
+        if (uploadedFiles.length > 0 && response.content && response.content.id) {
+            await window.fileUploadHandler.linkFilesToContent(response.content.id);
+        }
+        
         showMessage(messageDiv, 'success', 'تم إرسال مشاركتك بنجاح! سنقوم بمراجعتها قريباً.');
         document.getElementById('knowledgeForm').reset();
+        
+        // Reset file upload handler
+        if (window.fileUploadHandler) {
+            window.fileUploadHandler.reset();
+        }
         
         // Close modal after 2 seconds
         setTimeout(() => {
@@ -303,6 +319,11 @@ function showMessage(element, type, message) {
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
+    // Initialize file upload handler
+    if (typeof FileUploadHandler !== 'undefined') {
+        window.fileUploadHandler = new FileUploadHandler(apiClient);
+    }
+    
     // Load categories for dropdown and categories page
     loadCategories();
     
@@ -329,4 +350,9 @@ function getCategorySlugFromURL() {
 document.getElementById('knowledgeModal')?.addEventListener('hidden.bs.modal', function() {
     document.getElementById('knowledgeMessage').classList.add('d-none');
     document.getElementById('knowledgeForm').reset();
+    
+    // Reset file upload handler
+    if (window.fileUploadHandler) {
+        window.fileUploadHandler.reset();
+    }
 });
