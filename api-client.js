@@ -205,7 +205,7 @@ class DiwanAPIClient {
      * Submit new content
      */
     async submitContent(contentData) {
-        return await this.request('/content', {
+        return await this.request('/content/submit', {
             method: 'POST',
             body: JSON.stringify(contentData)
         });
